@@ -13,7 +13,6 @@ func main() {
 		Addr:    ":8080",
 		Handler: server_mux,
 	}
-
 	server.ListenAndServe()
 
 }
