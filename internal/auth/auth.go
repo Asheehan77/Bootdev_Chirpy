@@ -1,6 +1,11 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/alexedwards/argon2id"
@@ -59,4 +64,29 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 	return id, nil
+}
+
+func GetBearerToken(headers http.Header) (string, error) {
+	bearer := headers.Get("Authorization")
+	tok, err := strings.CutPrefix(bearer, "Bearer ")
+	if err != true {
+		return "", fmt.Errorf("Failed to get bearer token\n")
+	}
+	return tok, nil
+}
+
+func MakeRefreshToken() string {
+	hexbyte := make([]byte, 32)
+	rand.Read(hexbyte)
+	hexstring := hex.EncodeToString(hexbyte)
+	return hexstring
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+	bearer := headers.Get("Authorization")
+	tok, err := strings.CutPrefix(bearer, "ApiKey ")
+	if err != true {
+		return "", fmt.Errorf("Failed to get bearer token\n")
+	}
+	return tok, nil
 }
