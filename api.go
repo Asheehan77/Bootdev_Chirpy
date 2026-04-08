@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,11 +107,37 @@ func (cfg *apiConfig) getchirpHandler(writer http.ResponseWriter, req *http.Requ
 
 	res_slice := []response{}
 
-	chirps, err := cfg.queries.GetChirps(context.Background())
-	if err != nil {
-		writer.WriteHeader(500)
-		log.Printf("Error getting chirp: %s\n", err)
-		return
+	var chirps []database.Chirp
+	var err error
+	auth := req.URL.Query().Get("author_id")
+
+	if auth != "" {
+		authid, err := uuid.Parse(auth)
+		if err != nil {
+			writer.WriteHeader(401)
+			log.Printf("Error getting chirp: %s\n", err)
+			return
+		}
+		chirps, err = cfg.queries.GetChirpsAuth(context.Background(), authid)
+		if err != nil {
+			writer.WriteHeader(500)
+			log.Printf("Error getting chirp: %s\n", err)
+			return
+		}
+	} else {
+		chirps, err = cfg.queries.GetChirps(context.Background())
+		if err != nil {
+			writer.WriteHeader(500)
+			log.Printf("Error getting chirp: %s\n", err)
+			return
+		}
+	}
+	sortflag := req.URL.Query().Get("sort")
+
+	if sortflag == "asc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.Before(chirps[j].CreatedAt) })
+	} else if sortflag == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
 	}
 
 	for _, chirp := range chirps {
@@ -412,6 +439,10 @@ func (cfg *apiConfig) updateUserHandler(writer http.ResponseWriter, req *http.Re
 	res := response{}
 	decoder := json.NewDecoder(req.Body)
 	err := decoder.Decode(&param)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		writer.WriteHeader(500)
+	}
 
 	btok, berr := auth.GetBearerToken(req.Header)
 	if berr != nil {
@@ -433,11 +464,7 @@ func (cfg *apiConfig) updateUserHandler(writer http.ResponseWriter, req *http.Re
 		return
 	}
 
-	if err != nil {
-		log.Printf("Error decoding parameters: %s", err)
-		writer.WriteHeader(500)
-	} else if param.Email != "" || param.Password != "" {
-
+	if param.Email != "" || param.Password != "" {
 		newPass, err := auth.HashPassword(param.Password)
 		if err != nil {
 			log.Printf("Error creating user password: %s", err)

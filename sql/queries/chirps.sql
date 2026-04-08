@@ -19,3 +19,6 @@ WHERE id = $1;
 -- name: DeleteChirp :exec
 DELETE FROM chirps 
 WHERE id = $1;
+
+-- name: GetChirpsAuth :many
+Select * from chirps where user_id = $1;
